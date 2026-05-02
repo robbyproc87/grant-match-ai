@@ -25,6 +25,16 @@ Each user belongs to an `org` (multi-tenant from day one). Onboarding writes `or
 4. Seed data: `npm run seed` (funders from ProPublica → grants from curated list)
 5. Run dev: `npm run dev` (port 5000)
 
+### Supabase project settings (one-time, in the Supabase dashboard)
+These live in the Supabase web console — they are not in code:
+- **Auth → Email Templates → Magic Link**: replace the default "Supabase Auth"
+  sender name with "GrantMatch AI" and update the from-address / template copy
+  to match the product voice.
+- **Auth → URL Configuration**: add `${NEXT_PUBLIC_SITE_URL}/auth/callback` to
+  the redirect allow-list (and your production domain when you deploy).
+- **Auth → Sessions**: set the JWT/refresh-token lifetime to 30 days so users
+  stay signed in across visits without re-requesting a magic link.
+
 ## Scripts
 - `npm run dev` — Next dev server on port 5000
 - `npm run build` / `npm run start` — production build / start (uses `$PORT`)
