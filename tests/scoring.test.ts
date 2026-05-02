@@ -171,9 +171,13 @@ describe("Haiku failure path (mission-population)", () => {
     process.env.ANTHROPIC_API_KEY = "test";
     process.env.NEXT_PUBLIC_SUPABASE_URL = "http://x";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "x";
+    vi.resetModules();
   });
   afterEach(() => {
     vi.resetModules();
+    vi.doUnmock("ai");
+    vi.doUnmock("@ai-sdk/anthropic");
+    vi.doUnmock("@/lib/supabase/admin");
   });
   it("(c) malformed JSON response → throws after retry", async () => {
     vi.doMock("ai", () => ({

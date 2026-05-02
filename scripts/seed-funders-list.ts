@@ -20,7 +20,7 @@ export const CURATED_FUNDER_EINS: Array<{ ein: string; fallbackName: string }> =
   { ein: "131623888", fallbackName: "American Cancer Society" },
   { ein: "135562162", fallbackName: "Leukemia & Lymphoma Society" },
   { ein: "382750366", fallbackName: "Starlight Children's Foundation" },
-  { ein: "942681680", fallbackName: "Make-A-Wish America" },
+  { ein: "237395681", fallbackName: "Lance Armstrong Foundation (Livestrong)" },
   { ein: "521693387", fallbackName: "Children's Miracle Network Hospitals" },
   { ein: "954135898", fallbackName: "Children's Hospital Foundation" },
   { ein: "133391377", fallbackName: "Tiger Woods Foundation" },
