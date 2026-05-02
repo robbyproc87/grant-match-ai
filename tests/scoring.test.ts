@@ -169,6 +169,8 @@ describe("composeScore", () => {
 describe("Haiku failure path (mission-population)", () => {
   beforeEach(() => {
     process.env.ANTHROPIC_API_KEY = "test";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "http://x";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "x";
   });
   afterEach(() => {
     vi.resetModules();
@@ -191,5 +193,94 @@ describe("Haiku failure path (mission-population)", () => {
         funderName: "x",
       }),
     ).rejects.toThrow();
+  });
+
+  it("runner writes match_scores.status='failed' with non-empty error_message on Haiku malformed output", async () => {
+    vi.doMock("ai", () => ({
+      generateText: vi.fn().mockResolvedValue({ text: "not json" }),
+    }));
+    vi.doMock("@ai-sdk/anthropic", () => ({ anthropic: () => ({}) }));
+
+    type Row = Record<string, unknown>;
+    const upserts: Array<{ table: string; row: Row }> = [];
+    const fakeOrgRow = {
+      org_id: "o1",
+      ein: "12-3456789",
+      org_name: "Org",
+      org_type: "nonprofit",
+      has_501c3: true,
+      years_operating: 5,
+      annual_budget: 100_000,
+      mission: "m",
+      focus_areas: [],
+      populations_served: [],
+      geographies: ["AZ"],
+      past_grants: [],
+      updated_at: new Date().toISOString(),
+    };
+    const fakeGrant = {
+      id: "g1",
+      funder_id: "f1",
+      name: "G",
+      description: "d",
+      amount_min: 1000,
+      amount_max: 10_000,
+      deadline: null,
+      deadline_type: "rolling",
+      eligibility: { requires_501c3: true },
+      focus_areas: [],
+      geographies: ["AZ"],
+      source: "manual",
+      source_url: null,
+    };
+    const fakeFunder = {
+      id: "f1",
+      ein: "999",
+      name: "F",
+      description: null,
+      focus_areas: [],
+      geographies: ["AZ"],
+      total_assets: null,
+      source: "manual",
+      source_url: null,
+    };
+
+    vi.doMock("@/lib/supabase/admin", () => ({
+      createAdminClient: () => ({
+        from(table: string) {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    maybeSingle: async () => {
+                      if (table === "org_profiles") return { data: fakeOrgRow };
+                      if (table === "grants") return { data: fakeGrant };
+                      if (table === "funders") return { data: fakeFunder };
+                      return { data: null };
+                    },
+                  };
+                },
+              };
+            },
+            upsert: async (row: Row) => {
+              upserts.push({ table, row });
+              return { error: null };
+            },
+          };
+        },
+      }),
+    }));
+
+    const runner = await import("@/lib/scoring/runner");
+    await runner.computeOneScore("o1", "g1");
+
+    const failed = upserts.find(
+      (u) => u.table === "match_scores" && (u.row as Row).status === "failed",
+    );
+    expect(failed, "expected a match_scores upsert with status=failed").toBeTruthy();
+    const errMsg = (failed!.row as Row).error_message as string;
+    expect(typeof errMsg).toBe("string");
+    expect(errMsg.length).toBeGreaterThan(0);
   });
 });

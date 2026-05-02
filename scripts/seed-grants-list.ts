@@ -143,7 +143,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://wish.org",
   },
   {
-    funder_ein: "338088400",
+    funder_ein: "133088400",
     name: "Pediatric AIDS Innovation Fund",
     description:
       "Funds grassroots organizations supporting children and families affected by HIV/AIDS.",
