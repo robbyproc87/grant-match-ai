@@ -1,0 +1,116 @@
+# GrantMatch AI — Phase 1: Foundation Build (Plan Mode)
+
+## Context
+There's an existing Replit project for GrantMatch AI: a single-file `index.html` React demo with hardcoded grants, fake keyword-matching chat, and CDN-loaded React/Tailwind/Babel. The visual design and 4-tab information architecture are good — preserve them. Everything else is placeholder. We're replacing the engine.
+
+## Goal of this session (Phase 1 — Foundation only)
+By end of session the app must:
+1. Run on Next.js 14 (App Router) + TypeScript + Supabase + Auth — multi-tenant from day one
+2. Have a working Organization Profile (the foundation — drives every downstream feature)
+3. Pull real data from ProPublica Nonprofit Explorer (free API) for funder intelligence
+4. Compute a real match score between an org's profile and each grant (no hardcoded scores)
+5. Have a Claude-powered chat that streams responses and knows the user's org context
+6. Preserve the existing visual design language
+
+## Out of scope this session (do NOT build)
+- Pipeline/Kanban view
+- Narrative shell generation (real Claude-driven document drafting)
+- Story bank / asset library
+- Document vault
+- Email or CRM integrations
+- Reporting calendar
+- Tool use in chat
+- Stripe/billing
+- Tests beyond a basic smoke test for the match-score function
+
+## Tech stack — non-negotiable
+- Next.js 14 App Router + TypeScript (strict mode)
+- Supabase (Postgres + Auth + Storage; enable pgvector extension now for Phase 2)
+- shadcn/ui + Tailwind (build-time, not CDN)
+- Anthropic Claude: `claude-sonnet-4-6` for chat, `claude-haiku-4-5-20251001` for utility/scoring calls
+- Server Components by default; Server Actions for mutations
+- Streaming for Claude chat responses
+- All secrets in env vars; provide `.env.example`
+
+## What to throw away
+- Single-file `index.html` architecture
+- All hardcoded grant data, hardcoded fit scores, keyword-switch chat
+- CDN React, CDN Tailwind, in-browser Babel
+- `class=` everywhere (replace with `className=`)
+
+## What to preserve
+- Visual aesthetic: purple gradient header, rounded cards with soft shadows, Inter font, fade-in animations, fit badges
+- 4-tab structure: Grants / Checklist / Shell / Chat (Shell tab can be a stub for now — show "Coming in Phase 2")
+- Mobile-first layout
+
+## Database schema (Phase 1)
+Tables — apply Supabase RLS on every one (only org members can read/write their org's data):
+- `orgs` (id, name, ein, owner_user_id, created_at)
+- `org_members` (org_id, user_id, role: owner|admin|writer|viewer)
+- `org_profiles` (org_id PK, mission, focus_areas[], populations_served[], geographies[], annual_budget, years_operating, past_grants_received jsonb, updated_at)
+- `programs` (id, org_id, name, description, target_population, geography, budget, outcomes_summary)
+- `funders` (id, ein UNIQUE, name, type, website, propublica_data jsonb, last_synced_at)
+- `grants` (id, funder_id, name, amount_min, amount_max, deadline, deadline_type: rolling|fixed|loi, eligibility jsonb, focus_areas[], geographies[], source: grants_gov|propublica|manual, source_url)
+- `applications` (id, org_id, grant_id, stage: researching|drafting|submitted|decided|awarded|declined, created_at, updated_at)
+- `match_scores` (org_id, grant_id composite PK, score_total, score_breakdown jsonb, computed_at)
+- `messages` (id, application_id NULLABLE, org_id, user_id, role: user|assistant, content, created_at)
+
+## Match scoring algorithm v1 (compute server-side, cache in `match_scores`)
+score_total (0-100) = sum of:
+- **mission_alignment (0-30)**: semantic similarity org mission/focus_areas ↔ grant focus_areas. Single Haiku call returns score with reasoning. Cache.
+- **geographic_fit (0-15)**: 15 if org geographies ∩ grant geographies non-empty OR grant is national; else 0
+- **budget_fit (0-15)**: 15 if org annual_budget within funder's typical range OR funder unrestricted; 5 if close; 0 if mismatch
+- **eligibility (0-15)**: binary check against grant.eligibility JSON (501(c)(3), org age, etc.)
+- **population_alignment (0-15)**: semantic similarity org populations_served ↔ grant target populations. Haiku call.
+- **prior_relationship (0-10)**: +5 prior application with this funder, +10 prior award
+
+Return total + full factor breakdown. UI shows total, expandable to show factors. Recompute on org_profile or grant change.
+
+## ProPublica integration
+- API: https://projects.propublica.org/nonprofits/api (free, no key needed, rate-limited — cache aggressively)
+- Build `lib/sources/propublica.ts` implementing a `SourceAdapter` interface so Phase 2 sources (Grants.gov, Candid, etc.) plug in without rewrite
+- Adapter contract: `searchFoundations(query)`, `getFoundationDetails(ein)`, `getRecentGrants(ein)`
+- On first run, seed `funders` table with ~25 foundations matching keywords: "pediatric", "children's health", "Arizona", "hospital", "rare disease"
+- Each funder row should populate: recent grants (3 yrs), avg grant size, board info when available
+
+## Claude chat integration
+- Route: `app/api/chat/route.ts`, streaming response (Vercel AI SDK or native stream)
+- System prompt must include: org name, mission, focus areas, annual budget, populations served, current grant context (if user is viewing one)
+- Model: `claude-sonnet-4-6`
+- Persist user + assistant messages to `messages` table
+- No tool use yet — contextual chat only
+
+## Onboarding flow
+First login → if no org_profile → wizard (3 steps: Org basics & EIN / Mission + populations + geographies / Past grants) → save → land on Grants tab with computed match scores rendering
+
+## UI requirements
+- Use shadcn/ui components (Button, Card, Input, Tabs, Dialog, Toast, Form)
+- Tabs route-driven: `/dashboard/grants`, `/dashboard/checklist`, `/dashboard/shell`, `/dashboard/chat`
+- Empty states for every tab (especially before org_profile complete)
+- Loading skeletons when fetching grants/scores
+- Toast notifications on save
+
+## Deliverables checklist
+- [ ] Next.js + TS + Tailwind builds and runs
+- [ ] Supabase migrations applied, RLS policies in place on all tables
+- [ ] User signs up via email magic link
+- [ ] Onboarding wizard creates org + org_profile
+- [ ] Grants tab renders live data from `grants` table (seeded from ProPublica)
+- [ ] Each grant card displays a real, computed match score (not hardcoded)
+- [ ] Tapping a grant shows the score breakdown by factor
+- [ ] Chat tab streams responses from Claude with full org context in the system prompt
+- [ ] Chat history persists across reloads
+- [ ] Zero `class=` attributes; zero CDN scripts; zero hardcoded grant data
+- [ ] `.env.example` lists: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY
+- [ ] One smoke test for the match-score function
+
+## Plan mode instructions
+Do NOT write code yet. Return a structured plan covering:
+1. Final file/folder structure
+2. Supabase migration sequence (SQL files in order)
+3. Component breakdown by route
+4. Order of implementation (what to build first, second, third)
+5. Explicit confirmation that out-of-scope items are NOT in your plan
+6. Any clarifying questions before you'd start building
+
+If anything in this brief is ambiguous, ASK. Don't assume.

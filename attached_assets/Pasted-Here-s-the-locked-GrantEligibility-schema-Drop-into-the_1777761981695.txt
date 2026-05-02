@@ -1,0 +1,124 @@
+Here's the locked GrantEligibility schema. Drop into the codebase exactly as specified.
+
+## File: `lib/types/eligibility.ts`
+
+```typescript
+import { z } from "zod";
+
+/**
+ * GrantEligibility — locked schema for the eligibility JSONB column on `grants`.
+ * Stored in Postgres as jsonb. Validated at read-time with Zod.
+ *
+ * Scoring (0–15, binary):
+ *   - 15 if all evaluated hard rules pass
+ *   - 0  if any evaluated hard rule fails
+ *   - Missing/undefined optional fields = "no constraint" (do not penalize)
+ *   - `custom_rules` are NEVER auto-evaluated — surfaced to user as manual checks
+ *   - If JSON fails Zod parse: score 0, factor reasoning = "malformed eligibility data"
+ */
+export const GrantEligibilitySchema = z.object({
+  // Hard rule: org must be a registered 501(c)(3). Default: required.
+  requires_501c3: z.boolean(),
+
+  // Hard rule: org age in years (inclusive). Optional.
+  min_org_years: z.number().int().min(0).optional(),
+
+  // Hard rule: org annual budget bounds in USD. Optional.
+  // Inclusive range; either bound can be set independently.
+  min_org_budget: z.number().nonnegative().optional(),
+  max_org_budget: z.number().nonnegative().optional(),
+
+  // Hard rule: allowed org type categories. If present, org must match at least one.
+  allowed_org_types: z
+    .array(z.enum(["nonprofit", "school", "government", "tribal"]))
+    .optional(),
+
+  // Hard rule: org's geographies must intersect this list (or list contains "national").
+  // Use 2-letter US state codes (uppercase) or the literal "national".
+  allowed_geographies: z.array(z.string()).optional(),
+
+  // Hard rule: org's geographies must NOT intersect this list.
+  // Same format as allowed_geographies.
+  excluded_geographies: z.array(z.string()).optional(),
+
+  // Soft rules: human-readable strings shown to the user as a manual checklist.
+  // NEVER affect the auto-computed score.
+  custom_rules: z.array(z.string()).optional(),
+});
+
+export type GrantEligibility = z.infer<typeof GrantEligibilitySchema>;
+```
+
+## Scoring function contract — `lib/scoring/factors/eligibility.ts`
+
+```typescript
+import { GrantEligibilitySchema } from "@/lib/types/eligibility";
+
+type EligibilityResult = {
+  score: 0 | 15;
+  reasoning: string;
+  failed_rules: string[];      // empty if score=15
+  manual_checks: string[];     // copied from custom_rules for UI display
+};
+
+export function scoreEligibility(
+  rawEligibility: unknown,
+  orgProfile: { 
+    has_501c3: boolean; 
+    years_operating: number; 
+    annual_budget: number; 
+    org_type: "nonprofit" | "school" | "government" | "tribal";
+    geographies: string[];     // org's geographies, normalized to uppercase state codes or "national"
+  }
+): EligibilityResult {
+  const parsed = GrantEligibilitySchema.safeParse(rawEligibility);
+  if (!parsed.success) {
+    return {
+      score: 0,
+      reasoning: "malformed eligibility data",
+      failed_rules: ["malformed_schema"],
+      manual_checks: [],
+    };
+  }
+  // Evaluate each hard rule. Collect failures. Score = 15 only if zero failures.
+  // Implementation per the rules described in the JSDoc above.
+}
+```
+
+## Seed example — what eligibility looks like in `scripts/seed-grants-list.ts`
+
+```typescript
+{
+  name: "Arizona Community Foundation – Responsive Grants",
+  funder_ein: "86-0348502",
+  amount_min: 5000,
+  amount_max: 25000,
+  deadline: "2026-05-15",
+  deadline_type: "rolling",
+  focus_areas: ["community_health", "pediatric_health", "children"],
+  geographies: ["AZ"],
+  source: "manual",
+  source_url: "https://azfoundation.org/grants",
+  eligibility: {
+    requires_501c3: true,
+    allowed_org_types: ["nonprofit"],
+    allowed_geographies: ["AZ"],
+    custom_rules: [
+      "Organization must serve Arizona residents",
+      "Project must be completed within 12 months of award"
+    ]
+  }
+},
+```
+
+## Build behavior
+
+- `custom_rules` strings render in the grant detail panel under a "Manual review" subsection — checkbox UI, local state, no auto-evaluation.
+- `score_breakdown.eligibility` includes `failed_rules` and `manual_checks` arrays so the UI can surface specifics ("Failed: org budget exceeds max").
+- Tests required for step 5 (in addition to the malformed-JSON test):
+  - `requires_501c3: true` + org without 501(c)(3) → score 0
+  - All bounds satisfied → score 15
+  - Empty eligibility object `{ requires_501c3: false }` → score 15 (no constraints to violate)
+  - Geography intersection works for both `allowed_geographies: ["AZ"]` and `allowed_geographies: ["national"]`
+
+You are now unblocked on step 5. Proceed to Build mode when Robby confirms.
