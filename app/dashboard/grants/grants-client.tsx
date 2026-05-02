@@ -157,7 +157,7 @@ function ScoreCell({
         }}
         className="text-xs text-destructive underline"
       >
-        Score unavailable — click to retry
+        Score unavailable — retrying
       </button>
     );
   }

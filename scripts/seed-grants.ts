@@ -45,6 +45,8 @@ async function main() {
       console.error(`  ❌ failed:`, err instanceof Error ? err.message : err);
       failed.push(g.name);
     }
+    // Light backoff for parity with funder seeding — keeps us friendly to Supabase.
+    await new Promise((r) => setTimeout(r, 100));
   }
 
   console.log(`\n✅ ${ok} grants seeded, ❌ ${failed.length} failed`);
