@@ -22,13 +22,14 @@ async function loadGrantWithFunder(grantId: string) {
     .eq("id", grantId)
     .maybeSingle();
   if (!grant) return null;
+  const grantTyped = grant as unknown as Grant;
   const { data: funder } = await sb
     .from("funders")
     .select("*")
-    .eq("id", (grant as Grant).funder_id)
+    .eq("id", grantTyped.funder_id)
     .maybeSingle();
   if (!funder) return null;
-  return { grant: grant as Grant, funder: funder as Funder };
+  return { grant: grantTyped, funder: funder as unknown as Funder };
 }
 
 export async function computeOneScore(orgId: string, grantId: string): Promise<void> {
@@ -77,6 +78,52 @@ export async function computeOneScore(orgId: string, grantId: string): Promise<v
       },
       { onConflict: "org_id,grant_id" },
     );
+  }
+}
+
+/**
+ * Stale-while-revalidate: if the org_profile.updated_at is newer than a row's
+ * computed_at, mark that row pending and recompute it. Cheap to call on every
+ * dashboard load — touches only stale rows.
+ */
+export async function requeueStaleScoresForOrg(orgId: string): Promise<void> {
+  const sb = createAdminClient();
+  const { data: prof } = await sb
+    .from("org_profiles")
+    .select("updated_at")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  const updatedAt = (prof as { updated_at?: string } | null)?.updated_at;
+  if (!updatedAt) return;
+
+  const { data: stale } = await sb
+    .from("match_scores")
+    .select("grant_id, computed_at, status")
+    .eq("org_id", orgId)
+    .or(`computed_at.is.null,computed_at.lt.${updatedAt}`);
+  const rows = (stale ?? []) as Array<{
+    grant_id: string;
+    computed_at: string | null;
+    status: string;
+  }>;
+  const toRecompute = rows.filter(
+    (r) => r.status === "computed" && r.computed_at && r.computed_at < updatedAt,
+  );
+  if (toRecompute.length === 0) return;
+  log("scoring", "requeueing stale scores", {
+    orgId,
+    count: toRecompute.length,
+  });
+  await sb.from("match_scores").upsert(
+    toRecompute.map((r) => ({
+      org_id: orgId,
+      grant_id: r.grant_id,
+      status: "pending" as const,
+    })),
+    { onConflict: "org_id,grant_id" },
+  );
+  for (const r of toRecompute) {
+    await computeOneScore(orgId, r.grant_id);
   }
 }
 

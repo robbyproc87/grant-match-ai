@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgProfile, getCurrentUser } from "@/lib/supabase/queries";
 import { GrantsClient } from "./grants-client";
+import { requeueStaleScoresForOrg } from "@/lib/scoring/runner";
+import { logError } from "@/lib/logger";
 import type { Grant, MatchScore } from "@/lib/types/db";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +13,12 @@ export default async function GrantsPage() {
   if (!user) redirect("/sign-in");
   const profile = await getCurrentOrgProfile(user.id);
   if (!profile) redirect("/onboarding/basics");
+
+  // Stale-while-revalidate: any score older than the org_profile.updated_at
+  // is recomputed in the background. Cheap on every load (no-op when fresh).
+  void requeueStaleScoresForOrg(profile.org_id).catch((err) =>
+    logError("scoring", "requeueStale failed", err),
+  );
 
   const supabase = createClient();
   const [grantsRes, scoresRes, fundersRes] = await Promise.all([

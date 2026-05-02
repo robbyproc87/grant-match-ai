@@ -2,7 +2,6 @@ import { streamText, type CoreMessage } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { CHAT_MODEL } from "@/lib/anthropic/models";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrgProfile, getCurrentUser } from "@/lib/supabase/queries";
 import { logError, log } from "@/lib/logger";
 
@@ -31,41 +30,36 @@ export async function POST(req: Request) {
     const userText =
       lastUser && typeof lastUser.content === "string" ? lastUser.content : "";
 
-    const result = await streamText({
-      model: anthropic(CHAT_MODEL),
-      system,
-      messages,
-      maxTokens: 1500,
-      onFinish: async ({ text }) => {
-        try {
-          const sb = createClient();
-          const rows: Array<Record<string, unknown>> = [];
-          if (userText.trim()) {
-            rows.push({
-              org_id: profile.org_id,
-              user_id: user.id,
-              role: "user",
-              content: userText,
-            });
-          }
-          if (text.trim()) {
-            rows.push({
-              org_id: profile.org_id,
-              user_id: user.id,
-              role: "assistant",
-              content: text,
-            });
-          }
-          if (rows.length > 0) {
-            await (sb.from("messages") as ReturnType<typeof sb.from>).insert(
-              rows as never,
-            );
-          }
-        } catch (err) {
-          logError("chat", "persist messages failed", err);
-        }
-      },
-    });
+    const onFinish = makeOnFinish(profile.org_id, user.id, userText);
+
+    const tryStream = () =>
+      streamText({
+        model: anthropic(CHAT_MODEL),
+        system,
+        messages,
+        maxTokens: 1500,
+        onFinish,
+      });
+
+    let result;
+    try {
+      result = await tryStream();
+    } catch (firstErr) {
+      logError("chat", "stream attempt 1 failed, retrying once", firstErr);
+      try {
+        result = await tryStream();
+      } catch (secondErr) {
+        logError("chat", "stream attempt 2 failed, degrading", secondErr);
+        return new Response(
+          JSON.stringify({
+            error:
+              "The assistant is having trouble responding right now. Please try again in a moment.",
+            degraded: true,
+          }),
+          { status: 503, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    }
 
     log("chat", "stream started", { orgId: profile.org_id });
     return result.toDataStreamResponse();
@@ -78,6 +72,38 @@ export async function POST(req: Request) {
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
+}
+
+function makeOnFinish(orgId: string, userId: string, userText: string) {
+  return async ({ text }: { text: string }) => {
+    try {
+      const sb = createClient();
+      const rows: Array<Record<string, unknown>> = [];
+      if (userText.trim()) {
+        rows.push({
+          org_id: orgId,
+          user_id: userId,
+          role: "user",
+          content: userText,
+        });
+      }
+      if (text.trim()) {
+        rows.push({
+          org_id: orgId,
+          user_id: userId,
+          role: "assistant",
+          content: text,
+        });
+      }
+      if (rows.length > 0) {
+        await (sb.from("messages") as ReturnType<typeof sb.from>).insert(
+          rows as never,
+        );
+      }
+    } catch (err) {
+      logError("chat", "persist messages failed", err);
+    }
+  };
 }
 
 function buildSystemPrompt(profile: {

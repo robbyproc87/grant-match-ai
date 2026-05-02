@@ -12,8 +12,8 @@ export function FitBadge({ score }: { score: number }) {
         {[1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: i <= filled ? color : "#e5e7eb" }}
+            className={`h-2 w-2 rounded-full ${i <= filled ? "" : "bg-muted"}`}
+            style={i <= filled ? { backgroundColor: color } : undefined}
           />
         ))}
       </div>
