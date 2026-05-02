@@ -1,30 +1,40 @@
-# GrantMatch AI — Jazmine's Journey
+# GrantMatch AI — Phase 1
 
 ## Project Overview
-A single-page frontend web application that serves as a grant-writing assistant for the nonprofit organization "Jazmine's Journey." It helps users find matched funding opportunities, provides application templates (shells), offers a submission checklist, and includes a simulated AI chat assistant for grant-writing strategy.
+A grant-discovery and writing assistant for nonprofits, focused on Jazmine&rsquo;s Journey as the launch tenant but multi-tenant from day one. Phase 1 ships an org profile, ProPublica-backed funders, hand-curated open grants, server-computed match scores, and streaming Claude chat.
 
-## Architecture
-- **Type:** Static frontend-only application (no backend, no build system)
-- **Entry point:** `index.html`
-- **Dependencies:** Loaded via CDN (no package.json)
-  - React 18 (via unpkg)
-  - Babel Standalone (for in-browser JSX transpilation)
-  - Tailwind CSS (via CDN)
-  - Google Fonts (Inter)
+## Stack
+- Next.js 14 App Router, React Server Components, Server Actions
+- TypeScript (strict)
+- Supabase (Postgres + Auth + Storage, `pgvector` enabled)
+- shadcn/ui (new-york), Tailwind CSS, Inter via `next/font/google`
+- Vercel AI SDK (`ai` + `@ai-sdk/anthropic`) — `claude-sonnet-4-6` chat, `claude-haiku-4-5-20251001` utility
 
-## Running the App
-The app is served with Python's built-in HTTP server:
-```
-python3 -m http.server 5000
-```
-Workflow: "Start application" on port 5000
+## Running locally
+- `npm run dev` — Next dev on port 5000 (workflow: `Start application`)
+- `npm run migrate` — apply Supabase migrations (requires `SUPABASE_DB_URL`)
+- `npm run seed` — seed funders (ProPublica) + grants (curated)
+
+## Required environment variables
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_DB_URL`
+- `ANTHROPIC_API_KEY`
+- `NEXT_PUBLIC_SITE_URL`
+
+## Architecture notes
+- **Multi-tenant**: every org-data table joins through `org_members` for RLS.
+- **Scoring**: 6 factors (mission 30 + geo 15 + budget 15 + eligibility 15 + population 15 + prior 10 = 100). Deterministic factors are pure TS; mission + population batched into one Haiku JSON call. Runner upserts `match_scores` rows with status lifecycle `pending → computing → computed | failed`.
+- **Onboarding**: 3 steps (`/onboarding/basics`, `/mission`, `/history`). Final step fire-and-forgets `recomputeScoresForOrg` and redirects to `/dashboard/grants`, where the client polls `match_scores` every 2s until terminal.
+- **Chat**: streamed via Vercel AI SDK; system prompt = org-level context only (Phase 1).
+- **Eligibility**: locked Zod schema in `lib/types/eligibility.ts`. `custom_rules` are NEVER auto-evaluated — surfaced as a manual checkbox checklist.
+- **Models**: pinned in `lib/anthropic/models.ts` — never substitute.
 
 ## Deployment
-Configured as a **static** deployment with `publicDir: "."`.
+- `output: 'standalone'` in `next.config.mjs`.
+- Production run command: `next start -p $PORT -H 0.0.0.0`.
+- Health: `/api/health`.
 
-## Key Features
-- Grant matching with fit scores
-- Application narrative shell templates
-- Submission checklist
-- Simulated AI chat assistant (keyword-based)
-- All data is hardcoded mock data in `index.html`
+## Out of scope (Phase 1)
+Pipeline/Kanban, Claude narrative shell drafting, story bank, document vault, email/CRM, reporting calendar, tool use, Stripe, analytics, Sentry, i18n, landing page.

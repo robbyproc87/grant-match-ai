@@ -1,4 +1,4 @@
-modules = ["web", "python-3.11"]
+modules = ["web", "python-3.11", "nodejs-20"]
 [agent]
 expertMode = true
 
@@ -23,7 +23,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python3 -m http.server 5000"
+args = "npm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
@@ -34,5 +34,7 @@ localPort = 5000
 externalPort = 80
 
 [deployment]
-deploymentTarget = "static"
+deploymentTarget = "autoscale"
 publicDir = "."
+run = ["npm", "run", "start"]
+build = ["npm", "run", "build"]
