@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/supabase/queries";
 import { recomputeScoresForOrg } from "@/lib/scoring/actions";
 import { log, logError } from "@/lib/logger";
 import type { PastGrant } from "@/lib/types/db";
@@ -183,6 +184,9 @@ export async function searchFundersForTypeahead(
   q: string,
 ): Promise<Array<{ id: string; name: string }>> {
   if (!q || q.length < 2) return [];
+  // Defense-in-depth: only authenticated users can hit this typeahead.
+  const user = await getCurrentUser();
+  if (!user) return [];
   const sb = createAdminClient();
   const { data } = await sb
     .from("funders")
