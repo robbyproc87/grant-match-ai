@@ -18,17 +18,18 @@ returns boolean language sql stable security definer set search_path = public, p
   );
 $$;
 
--- ORGS: members can read; only authenticated users can insert (during onboarding).
+-- ORGS: members can read. INSERT/UPDATE/DELETE are denied to all clients —
+-- onboarding uses the service-role key (bypasses RLS) to create orgs safely.
 drop policy if exists orgs_select on orgs;
 create policy orgs_select on orgs for select using (is_org_member(id));
-drop policy if exists orgs_insert on orgs;
-create policy orgs_insert on orgs for insert with check (auth.uid() is not null);
 
--- ORG_MEMBERS: members can read their own rows; insert allowed during onboarding for self.
+-- ORG_MEMBERS: members can read their own rows. Writes are denied to clients
+-- (no INSERT/UPDATE/DELETE policy). Membership is created only via service-role
+-- onboarding flow or future invitation flow. This prevents tenant takeover by
+-- self-inserting into another org's `org_members`.
 drop policy if exists org_members_select on org_members;
 create policy org_members_select on org_members for select using (user_id = auth.uid());
 drop policy if exists org_members_insert on org_members;
-create policy org_members_insert on org_members for insert with check (user_id = auth.uid());
 
 -- ORG_PROFILES: scoped to org members.
 drop policy if exists org_profiles_select on org_profiles;
