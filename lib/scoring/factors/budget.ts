@@ -1,7 +1,3 @@
-// Phase 1 intentional upgrade vs. brief: brief specified an "in/close/out"
-// heuristic; we use ratio-based tiers (1-50% = 15, 50-100% = 10, <1% = 8,
-// >100% = 3) which matches how funders actually evaluate capacity. Do not
-// "fix" back.
 export function scoreBudget(
   amountMin: number | null,
   amountMax: number | null,

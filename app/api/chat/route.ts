@@ -78,7 +78,13 @@ function makeOnFinish(orgId: string, userId: string, userText: string) {
   return async ({ text }: { text: string }) => {
     try {
       const sb = createClient();
-      const rows: Array<Record<string, unknown>> = [];
+      type MessageInsert = {
+        org_id: string;
+        user_id: string;
+        role: "user" | "assistant";
+        content: string;
+      };
+      const rows: MessageInsert[] = [];
       if (userText.trim()) {
         rows.push({
           org_id: orgId,
@@ -96,9 +102,11 @@ function makeOnFinish(orgId: string, userId: string, userText: string) {
         });
       }
       if (rows.length > 0) {
-        await (sb.from("messages") as ReturnType<typeof sb.from>).insert(
-          rows as never,
-        );
+        // The Database type still uses permissive `Record<string, unknown>` for
+        // Insert (replaced in Phase 2 follow-up #3 by `supabase gen types`),
+        // so the typed client can't infer the row shape here. Cast through
+        // unknown to MessageInsert which IS strictly typed at construction.
+        await sb.from("messages").insert(rows as unknown as never);
       }
     } catch (err) {
       logError("chat", "persist messages failed", err);

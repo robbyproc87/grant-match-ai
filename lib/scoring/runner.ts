@@ -9,27 +9,28 @@ async function loadOrg(orgId: string): Promise<OrgProfile | null> {
     .from("org_profiles")
     .select("*")
     .eq("org_id", orgId)
-    .maybeSingle();
+    .maybeSingle<OrgProfile>();
   if (!data) return null;
-  return { ...(data as Record<string, unknown>), org_id: orgId } as OrgProfile;
+  return { ...data, org_id: orgId };
 }
 
-async function loadGrantWithFunder(grantId: string) {
+async function loadGrantWithFunder(
+  grantId: string,
+): Promise<{ grant: Grant; funder: Funder } | null> {
   const sb = createAdminClient();
   const { data: grant } = await sb
     .from("grants")
     .select("*")
     .eq("id", grantId)
-    .maybeSingle();
+    .maybeSingle<Grant>();
   if (!grant) return null;
-  const grantTyped = grant as unknown as Grant;
   const { data: funder } = await sb
     .from("funders")
     .select("*")
-    .eq("id", grantTyped.funder_id)
-    .maybeSingle();
+    .eq("id", grant.funder_id)
+    .maybeSingle<Funder>();
   if (!funder) return null;
-  return { grant: grantTyped, funder: funder as unknown as Funder };
+  return { grant, funder };
 }
 
 export async function computeOneScore(orgId: string, grantId: string): Promise<void> {
