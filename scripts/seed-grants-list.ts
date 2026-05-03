@@ -144,58 +144,6 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://wish.org",
   },
   {
-    funder_name: 'Pediatric AIDS Foundation',
-    name: "Pediatric AIDS Innovation Fund",
-    description:
-      "Funds grassroots organizations supporting children and families affected by HIV/AIDS.",
-    amount_min: 5000,
-    amount_max: 30000,
-    deadline: "2026-10-01",
-    deadline_type: "fixed",
-    eligibility: {
-      requires_501c3: true,
-      allowed_geographies: ["NATIONAL"],
-    },
-    focus_areas: ["Pediatric Health", "Family Support"],
-    geographies: ["NATIONAL"],
-    source_url: "https://www.pedaids.org",
-  },
-  {
-    funder_name: 'Starlight Children\'s Foundation',
-    name: "Starlight Hospital Happiness Grant",
-    description:
-      "Supports programs delivering comfort, distraction, and joy to hospitalized children.",
-    amount_min: 2500,
-    amount_max: 15000,
-    deadline: null,
-    deadline_type: "rolling",
-    eligibility: {
-      requires_501c3: true,
-      allowed_geographies: ["NATIONAL"],
-    },
-    focus_areas: ["Pediatric", "Comfort Care", "Hospital-based"],
-    geographies: ["NATIONAL"],
-    source_url: "https://www.starlight.org",
-  },
-  {
-    funder_name: 'Children\'s Miracle Network Hospitals',
-    name: "Hospital-Based Children's Program Grant",
-    description:
-      "Supports hospital-based programs that serve pediatric patients and families.",
-    amount_min: 10000,
-    amount_max: 100000,
-    deadline: "2026-11-15",
-    deadline_type: "fixed",
-    eligibility: {
-      requires_501c3: true,
-      min_org_years: 3,
-      allowed_geographies: ["NATIONAL"],
-    },
-    focus_areas: ["Pediatric Health", "Hospital-based", "Family Support"],
-    geographies: ["NATIONAL"],
-    source_url: "https://childrensmiraclenetworkhospitals.org",
-  },
-  {
     funder_name: 'Virginia G. Piper Charitable Trust',
     name: "Piper Trust Children & Family Grant",
     description:

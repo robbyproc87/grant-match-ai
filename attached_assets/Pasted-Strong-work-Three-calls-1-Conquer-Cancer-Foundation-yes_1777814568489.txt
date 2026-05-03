@@ -1,0 +1,52 @@
+Strong work. Three calls:
+
+1. Conquer Cancer Foundation — yes, add the override. But build it as 
+   a general-purpose escape hatch, not a one-off:
+   
+   - Create scripts/seed-funders-overrides.ts exporting:
+     export const FUNDER_EIN_OVERRIDES: Record<string, string> = {
+       "Conquer Cancer Foundation": "31-1667995",
+       "Rally Foundation for Childhood Cancer Research": "20-2447295",
+       "Nina Mason Pulliam Charitable Trust": "35-6549540",
+     };
+   
+   - Seeder logic: check FUNDER_EIN_OVERRIDES[name] first → if present, 
+     skip search, call getFoundationDetails(ein) directly. If absent, 
+     fall through to search-then-resolve as today.
+   
+   - Log overrides distinctly: "Seeding 15/25: Conquer Cancer Foundation 
+     → using override EIN 31-1667995 ✅"
+   
+   - Phase 2 follow-up note: when override is used, run a sanity check 
+     that getFoundationDetails returns a name that token-overlaps with 
+     the query name. If not, log a warning. Don't block.
+
+2. Sanitization for the three stuck queries — yes, do it. Strip:
+   - Trailing parenthetical region tags like " (AZ)"
+   - Plus signs (replace "+" with " plus ")
+   - Excess whitespace after stripping
+   
+   Apply to query string ONLY, not to the seed list — keep the seed list 
+   names human-readable. Sanitization happens in-resolver.
+   
+   For Rally Foundation and Nina Mason Pulliam: add to the override map 
+   above so they don't depend on search at all.
+
+3. Three orphan grants — drop them entirely. Don't reattach to wrong 
+   funders. Remove the three offending entries from seed-grants-list.ts 
+   so we don't see "skipped" warnings on future seed runs. Phase 2 grant 
+   curation will add new grants matched to the actual funders we have.
+
+After these changes, re-run npm run seed and paste the new summary. 
+Target: ✅ 25 funders, ✅ 9+ grants, 0 unmatched, 0 orphans.
+
+Then I log in for E2E.
+
+Phase 2 follow-ups to track:
+- Replace token-overlap heuristic with relevance-score-based confidence 
+  (the Conquer Cancer false positive case shows token-overlap is too 
+  permissive when all query tokens appear in a wrong org's name; 
+  relevance score is the better signal).
+- ProPublica search query sanitization: parens, plus signs, special 
+  chars are pre-existing rough edges. The strip rules above handle the 
+  three known cases but the deeper fix is a normalizer in the adapter.
