@@ -22,14 +22,14 @@ export const CURATED_FUNDER_NAMES: string[] = [
   "The Andrew McDonough B+ Foundation",
   "Hyundai Hope On Wheels",
   "Conquer Cancer Foundation",
-  "Rally Foundation for Childhood Cancer Research",
+  // "Rally Foundation for Childhood Cancer Research", // Not in ProPublica — defer to Phase 2 with richer source (Candid/GuideStar)
   "Cookies for Kids' Cancer",
   "American Childhood Cancer Organization",
   "Phoenix Children's Hospital Foundation",
   "Banner Health Foundation",
   "Flinn Foundation (AZ)",
   "Nina Mason Pulliam Charitable Trust",
-  "The Steele Foundation (AZ)",
+  // "The Steele Foundation (AZ)", // Not in ProPublica — defer to Phase 2 with richer source (Candid/GuideStar)
   "BHHS Legacy Foundation",
   "Thunderbirds Charities",
 ];

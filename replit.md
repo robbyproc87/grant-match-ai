@@ -38,3 +38,8 @@ A grant-discovery and writing assistant for nonprofits, focused on Jazmine&rsquo
 
 ## Out of scope (Phase 1)
 Pipeline/Kanban, Claude narrative shell drafting, story bank, document vault, email/CRM, reporting calendar, tool use, Stripe, analytics, Sentry, i18n, landing page.
+
+## Phase 2 deferred items (informal — promote to project tasks at Phase 2 kickoff)
+- Replace token-overlap heuristic in `scripts/seed-funders.ts` with a relevance-score-based confidence threshold (token-overlap false-positived on Conquer Cancer Foundation matching "Positive Actions To Conquer Cancer Foundation Corp"; ProPublica's `score` field is the better signal).
+- Move ProPublica query normalizer into `lib/sources/propublica.ts` (parens, `+`, special chars). Today the sanitization lives in `scripts/seed-funders.ts`; it should live in the adapter so all callers benefit.
+- Add a Candid/GuideStar source adapter to recover funders not in ProPublica (currently dropped from seed: Rally Foundation for Childhood Cancer Research, The Steele Foundation (AZ); also Pediatric AIDS Foundation, Starlight Children's Foundation, Children's Miracle Network Hospitals — orphan grants for these were removed).
