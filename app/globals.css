@@ -39,6 +39,13 @@
       hsl(258 100% 86%) 100%
     );
     --gm-card-shadow: 0 4px 24px rgba(15, 14, 31, 0.08);
+
+    /* Fit-score badge tiers — kept as design tokens so the badge color is
+       not hardcoded inside lib/utils.ts. Tiers: strong >=85, medium >=70,
+       weak <70. Consumed via fitColor() returning hsl(var(--fit-*)). */
+    --fit-strong: 142 71% 45%;
+    --fit-medium: 38 92% 50%;
+    --fit-weak: 0 84% 60%;
   }
 }
 

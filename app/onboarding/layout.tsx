@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/supabase/queries";
+import { getCurrentUser, getCurrentOrgId } from "@/lib/supabase/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +10,9 @@ export default async function OnboardingLayout({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
+  // Already-onboarded users (have an org membership) skip onboarding entirely.
+  const orgId = await getCurrentOrgId(user.id);
+  if (orgId) redirect("/dashboard/grants");
   return (
     <div className="min-h-screen bg-gm-gradient py-10">
       <div className="mx-auto max-w-xl px-4">

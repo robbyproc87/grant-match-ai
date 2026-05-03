@@ -44,6 +44,11 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        fit: {
+          strong: "hsl(var(--fit-strong))",
+          medium: "hsl(var(--fit-medium))",
+          weak: "hsl(var(--fit-weak))",
+        },
         gm: {
           purple50: "hsl(var(--gm-purple-50))",
           purple100: "hsl(var(--gm-purple-100))",

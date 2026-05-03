@@ -25,8 +25,10 @@ export function formatDeadline(d: string | null | undefined): string {
   }
 }
 
+// Returns a `hsl(var(--fit-*))` reference; the actual color tiers live in
+// `app/globals.css` so they stay tokenized with the rest of the design system.
 export function fitColor(score: number): string {
-  if (score >= 85) return "hsl(142 71% 45%)";
-  if (score >= 70) return "hsl(38 92% 50%)";
-  return "hsl(0 84% 60%)";
+  if (score >= 85) return "hsl(var(--fit-strong))";
+  if (score >= 70) return "hsl(var(--fit-medium))";
+  return "hsl(var(--fit-weak))";
 }
