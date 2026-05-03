@@ -1,7 +1,8 @@
 import type { GrantEligibility } from "@/lib/types/eligibility";
 
 export interface SeedGrant {
-  funder_ein: string;
+  /** Must match a name in scripts/seed-funders-list.ts (CURATED_FUNDER_NAMES). */
+  funder_name: string;
   name: string;
   description: string;
   amount_min: number;
@@ -16,7 +17,7 @@ export interface SeedGrant {
 
 export const CURATED_GRANTS: SeedGrant[] = [
   {
-    funder_ein: "860348542",
+    funder_name: 'Arizona Community Foundation',
     name: "Responsive Grants Program",
     description:
       "Flexible operating and program support for Arizona nonprofits serving community-defined needs.",
@@ -36,7 +37,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://azfoundation.org",
   },
   {
-    funder_ein: "860775872",
+    funder_name: 'Vitalyst Health Foundation',
     name: "Community Health Grant",
     description:
       "Supports Arizona-based health equity initiatives, with emphasis on underserved children and families.",
@@ -55,7 +56,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://vitalysthealth.org",
   },
   {
-    funder_ein: "232928785",
+    funder_name: 'Alex\'s Lemonade Stand Foundation',
     name: "Childhood Cancer Innovation Grant",
     description:
       "Supports innovative programs serving pediatric cancer patients and their families nationally.",
@@ -72,7 +73,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://alexslemonade.org",
   },
   {
-    funder_ein: "200267069",
+    funder_name: 'St. Baldrick\'s Foundation',
     name: "St. Baldrick's Hero Fund",
     description:
       "Funds named for and supporting children with cancer through targeted research and family support programs.",
@@ -90,7 +91,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://stbaldricks.org",
   },
   {
-    funder_ein: "133443694",
+    funder_name: 'Children\'s Health Fund',
     name: "Pediatric Program Grants",
     description:
       "Hospital-partnered grants supporting access to pediatric care for under-resourced communities.",
@@ -109,7 +110,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://childrenshealthfund.org",
   },
   {
-    funder_ein: "237227031",
+    funder_name: 'Phoenix Children\'s Hospital Foundation',
     name: "Family Support Mini-Grant",
     description:
       "Small-dollar grants supporting comfort, dignity, and family support programs at Phoenix Children's Hospital.",
@@ -126,7 +127,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://www.phoenixchildrensfoundation.org",
   },
   {
-    funder_ein: "942681680",
+    funder_name: 'Make-A-Wish Foundation of America',
     name: "Wish Granter Community Partner Grant",
     description:
       "Supports community organizations that partner with Make-A-Wish to enhance the wish experience.",
@@ -143,7 +144,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://wish.org",
   },
   {
-    funder_ein: "133088400",
+    funder_name: 'Pediatric AIDS Foundation',
     name: "Pediatric AIDS Innovation Fund",
     description:
       "Funds grassroots organizations supporting children and families affected by HIV/AIDS.",
@@ -160,7 +161,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://www.pedaids.org",
   },
   {
-    funder_ein: "382750366",
+    funder_name: 'Starlight Children\'s Foundation',
     name: "Starlight Hospital Happiness Grant",
     description:
       "Supports programs delivering comfort, distraction, and joy to hospitalized children.",
@@ -177,7 +178,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://www.starlight.org",
   },
   {
-    funder_ein: "521693387",
+    funder_name: 'Children\'s Miracle Network Hospitals',
     name: "Hospital-Based Children's Program Grant",
     description:
       "Supports hospital-based programs that serve pediatric patients and families.",
@@ -195,7 +196,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://childrensmiraclenetworkhospitals.org",
   },
   {
-    funder_ein: "860338070",
+    funder_name: 'Virginia G. Piper Charitable Trust',
     name: "Piper Trust Children & Family Grant",
     description:
       "Supports programs benefiting children and families across Maricopa County, Arizona.",
@@ -214,7 +215,7 @@ export const CURATED_GRANTS: SeedGrant[] = [
     source_url: "https://pipertrust.org",
   },
   {
-    funder_ein: "112856959",
+    funder_name: 'Pediatric Cancer Research Foundation',
     name: "Pediatric Cancer Research Family Grant",
     description:
       "Supports family-facing programs adjacent to pediatric oncology research efforts.",

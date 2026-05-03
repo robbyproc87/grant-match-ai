@@ -1,0 +1,70 @@
+Option A. Your reasoning is correct — name-driven keeps the adapter 
+pattern clean and Phase 2 (Grants.gov) will use the same shape.
+
+Three additions before you execute:
+
+1. Confidence logging: during the seed run, log the top hit's name AND 
+   relevance score for every funder, even successful ones. Format:
+   "Seeding 1/25: Arizona Community Foundation
+      → matched 'Arizona Community Foundation' (score: 142, EIN: 86-0348502) ✅"
+   
+   This lets us sanity-check your >100 threshold against actual data 
+   and adjust if needed. Don't lock the threshold yet — get the real 
+   distribution first.
+
+2. Match-name validation: when the top hit's name diverges meaningfully 
+   from the search query, surface it as a WARNING, not a silent pick. 
+   Use a simple check: if the top hit's name (normalized — lowercase, 
+   strip "foundation/fund/inc/the") doesn't share at least 60% of 
+   tokens with the query name (normalized same way), log:
+   
+   "⚠️  WARNING: 'Children's Hospital Foundation' → top hit 
+   'Phoenix Children's Hospital Foundation' — verify this is the 
+   intended org (or rename in seed list to be more specific)"
+   
+   Don't fail the seed on warnings — let it proceed. Print warning 
+   summary at the end alongside the success/fail counts.
+
+3. Update scripts/seed-funders-list.ts to a clean array of names 
+   (not EINs). Use the precise, full org names — better to be 
+   explicit ("Virginia G. Piper Charitable Trust") than fuzzy 
+   ("Piper Trust").
+
+   Curated name list:
+   - Arizona Community Foundation
+   - Vitalyst Health Foundation
+   - Virginia G. Piper Charitable Trust
+   - Helios Education Foundation
+   - Alex's Lemonade Stand Foundation
+   - St. Baldrick's Foundation
+   - Children's Health Fund
+   - Pediatric Cancer Research Foundation
+   - CureSearch for Children's Cancer
+   - Ronald McDonald House Charities
+   - Make-A-Wish Foundation of America
+   - National Pediatric Cancer Foundation
+   - The Andrew McDonough B+ Foundation
+   - Hyundai Hope On Wheels
+   - Conquer Cancer Foundation
+   - Rally Foundation for Childhood Cancer Research
+   - Cookies for Kids' Cancer
+   - American Childhood Cancer Organization
+   - Phoenix Children's Hospital Foundation
+   - Banner Health Foundation
+   - Flinn Foundation (AZ)
+   - Nina Mason Pulliam Charitable Trust
+   - The Steele Foundation (AZ)
+   - BHHS Legacy Foundation
+   - Thunderbirds Charities
+
+   That's 25. If any fail to match (no result above threshold), don't 
+   stop — log the failure, continue with the rest, and surface the 
+   list at the end so we can manually investigate.
+
+Once the seeder is updated, run it and paste:
+- Full output with all match scores and any warnings
+- Final summary: ✅ X seeded, ⚠️ Y warnings, ❌ Z unmatched
+- Then proceed to grants seed and dev server restart
+
+Holding pattern same as before — pause if anything unexpected 
+surfaces.

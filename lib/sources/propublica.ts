@@ -60,7 +60,11 @@ export const propublicaAdapter: SourceAdapter = {
 
   async searchFoundations(query: string): Promise<FoundationSummary[]> {
     try {
-      const url = `${BASE}/search.json?q=${encodeURIComponent(query)}&ntee%5Bid%5D=7`;
+      // Intentionally no ntee[id] filter: pediatric/health/education funders
+      // span NTEE B/E/G/T, and ProPublica returns 404 (not empty results) when
+      // a category filter excludes everything. The seeder validates each match
+      // by name-token overlap downstream, which is a stricter relevance gate.
+      const url = `${BASE}/search.json?q=${encodeURIComponent(query)}`;
       const data = await getJson<SearchResponse>(url);
       return (data.organizations ?? []).map((o) => ({
         ein: String(o.ein).padStart(9, "0"),
