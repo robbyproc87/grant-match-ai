@@ -1,6 +1,10 @@
 "use server";
 
-import { computeAllScoresForOrg, computeOneScore } from "./runner";
+import {
+  computeAllScoresForOrg,
+  computeOneScore,
+  recomputeAllNonComputedForOrg,
+} from "./runner";
 import { getCurrentUser, getCurrentOrgId } from "@/lib/supabase/queries";
 import { log, logError } from "@/lib/logger";
 
@@ -32,6 +36,19 @@ export async function recomputeScoresForOrg(orgId: string): Promise<void> {
     logError("scoring", "background computeAll failed", err),
   );
   log("scoring", "kicked off background compute", { orgId: verified });
+}
+
+/**
+ * Phase 1 escape hatch: requeue every match_scores row for this org that is
+ * NOT in 'computed' status. Useful when a Replit restart leaves rows stuck
+ * in 'computing'. Authz-checked; fire-and-forget.
+ */
+export async function recomputeAllForOrg(orgId: string): Promise<void> {
+  const verified = await requireOrgMembership(orgId);
+  void recomputeAllNonComputedForOrg(verified).catch((err) =>
+    logError("scoring", "background recomputeAll failed", err),
+  );
+  log("scoring", "kicked off recomputeAll", { orgId: verified });
 }
 
 export async function recomputeOneScore(

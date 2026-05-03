@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FitBadge } from "@/components/fit-badge";
 import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/browser";
-import { recomputeOneScore } from "@/lib/scoring/actions";
+import { recomputeAllForOrg, recomputeOneScore } from "@/lib/scoring/actions";
 import { formatCurrency, formatDeadline, cn } from "@/lib/utils";
 import type { Grant, MatchScore, ScoreBreakdown } from "@/lib/types/db";
 import { toast } from "sonner";
@@ -68,9 +68,23 @@ export function GrantsClient({ orgId, grants, initialScores, funderNames }: Prop
 
   return (
     <div className="animate-fade-in space-y-3">
-      <p className="px-1 text-xs text-muted-foreground">
-        Sorted by fit score • {sorted.length} opportunities
-      </p>
+      <div className="flex items-center justify-between px-1">
+        <p className="text-xs text-muted-foreground">
+          Sorted by fit score • {sorted.length} opportunities
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={hasInflight}
+          onClick={async () => {
+            await recomputeAllForOrg(orgId);
+            toast.success("Recomputing all scores…");
+            setTimeout(refetch, 500);
+          }}
+        >
+          Recompute all scores
+        </Button>
+      </div>
       {sorted.map((g) => {
         const s = scoreMap.get(g.id);
         const isSelected = selected === g.id;

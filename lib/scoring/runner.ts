@@ -127,6 +127,46 @@ export async function requeueStaleScoresForOrg(orgId: string): Promise<void> {
   }
 }
 
+/**
+ * Phase 1 defensive escape hatch: flip every match_scores row for this org
+ * that is in a non-terminal-success state ('pending' | 'computing' | 'failed')
+ * back to 'pending' with error_message cleared, then recompute each.
+ *
+ * Rows already in 'computed' are left alone (use `requeueStaleScoresForOrg`
+ * for the stale-while-revalidate path). This exists so a Replit instance
+ * restart that strands rows in 'computing' can be recovered by a single
+ * user click — Phase 2 will replace it with a proper job-queue sweeper.
+ */
+export async function recomputeAllNonComputedForOrg(orgId: string): Promise<void> {
+  const sb = createAdminClient();
+  const { data: rows } = await sb
+    .from("match_scores")
+    .select("grant_id, status")
+    .eq("org_id", orgId)
+    .in("status", ["pending", "computing", "failed"]);
+  const toRun = (rows ?? []) as Array<{ grant_id: string; status: string }>;
+  if (toRun.length === 0) {
+    log("scoring", "recomputeAllNonComputed: nothing to do", { orgId });
+    return;
+  }
+  log("scoring", "recomputeAllNonComputed: requeueing", {
+    orgId,
+    count: toRun.length,
+  });
+  await sb.from("match_scores").upsert(
+    toRun.map((r) => ({
+      org_id: orgId,
+      grant_id: r.grant_id,
+      status: "pending" as const,
+      error_message: null,
+    })),
+    { onConflict: "org_id,grant_id" },
+  );
+  for (const r of toRun) {
+    await computeOneScore(orgId, r.grant_id);
+  }
+}
+
 export async function computeAllScoresForOrg(orgId: string): Promise<void> {
   const sb = createAdminClient();
   const { data: grants } = await sb.from("grants").select("id");

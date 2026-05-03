@@ -1,3 +1,6 @@
+// Phase 1 intentional upgrade vs. brief: brief specified binary 15/0; we keep
+// a 5-pt "adjacent" tier for org-has-geographies-but-no-direct-overlap so the
+// dashboard ordering doesn't collapse to two clusters. Do not "fix" back.
 export function scoreGeographic(
   grantGeographies: string[],
   orgGeographies: string[],

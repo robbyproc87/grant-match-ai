@@ -288,3 +288,104 @@ describe("Haiku failure path (mission-population)", () => {
     expect(errMsg.length).toBeGreaterThan(0);
   });
 });
+
+describe("recomputeAllForOrg (Phase 1 escape hatch)", () => {
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = "test";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "http://x";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "x";
+    vi.resetModules();
+  });
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/lib/supabase/admin");
+    vi.doUnmock("@/lib/supabase/queries");
+  });
+
+  type Row = Record<string, unknown>;
+  function makeFakeAdmin(rows: Array<{ grant_id: string; status: string }>) {
+    const upserts: Array<{ table: string; rows: Row[] }> = [];
+    const client = {
+      from(table: string) {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  // recomputeAllNonComputedForOrg path: select(...).eq(...).in(...)
+                  in: async () => ({
+                    data: table === "match_scores" ? rows : [],
+                  }),
+                  // computeOneScore path: select(...).eq(...).maybeSingle()
+                  // Return null so the loader fails fast and computeOneScore
+                  // writes a 'failed' row instead of running the real pipeline.
+                  maybeSingle: async () => ({ data: null }),
+                };
+              },
+            };
+          },
+          upsert: async (payload: Row | Row[]) => {
+            upserts.push({
+              table,
+              rows: Array.isArray(payload) ? payload : [payload],
+            });
+            return { error: null };
+          },
+        };
+      },
+    };
+    return { client, upserts };
+  }
+
+  it("action requires org membership — throws when caller is not a member", async () => {
+    vi.doMock("@/lib/supabase/queries", () => ({
+      getCurrentUser: async () => ({ id: "user-1" }),
+      getCurrentOrgId: async () => "different-org",
+    }));
+    const { client } = makeFakeAdmin([]);
+    vi.doMock("@/lib/supabase/admin", () => ({ createAdminClient: () => client }));
+    const { recomputeAllForOrg } = await import("@/lib/scoring/actions");
+    await expect(recomputeAllForOrg("target-org")).rejects.toThrow(/Forbidden/);
+  });
+
+  it("flips qualifying rows (pending|computing|failed) back to pending with cleared error_message", async () => {
+    const { client, upserts } = makeFakeAdmin([
+      { grant_id: "g1", status: "computing" },
+      { grant_id: "g2", status: "failed" },
+      { grant_id: "g3", status: "pending" },
+    ]);
+    vi.doMock("@/lib/supabase/admin", () => ({ createAdminClient: () => client }));
+    const runner = await import("@/lib/scoring/runner");
+
+    await runner.recomputeAllNonComputedForOrg("o1");
+
+    // First match_scores upsert should be the bulk requeue with 3 pending rows.
+    const requeue = upserts.find(
+      (u) => u.table === "match_scores" && u.rows.length === 3,
+    );
+    expect(requeue, "expected a bulk requeue upsert with 3 rows").toBeTruthy();
+    for (const r of requeue!.rows) {
+      expect(r.status).toBe("pending");
+      expect(r.error_message).toBeNull();
+    }
+    // Then computeOneScore should have been invoked once per grant — each
+    // invocation upserts 'computing' first, so we expect exactly 3 such rows.
+    const computingUpserts = upserts.filter(
+      (u) =>
+        u.table === "match_scores" &&
+        u.rows.length === 1 &&
+        u.rows[0].status === "computing",
+    );
+    expect(computingUpserts).toHaveLength(3);
+  });
+
+  it("no-ops when no rows are in pending|computing|failed (all already computed)", async () => {
+    const { client, upserts } = makeFakeAdmin([]);
+    vi.doMock("@/lib/supabase/admin", () => ({ createAdminClient: () => client }));
+    const runner = await import("@/lib/scoring/runner");
+
+    await runner.recomputeAllNonComputedForOrg("o1");
+
+    expect(upserts).toHaveLength(0);
+  });
+});
