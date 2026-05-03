@@ -1,19 +1,11 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, getCurrentOrgId } from "@/lib/supabase/queries";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getCurrentUser,
+  getCurrentOrgId,
+  isOnboardingComplete,
+} from "@/lib/supabase/queries";
 
 export const dynamic = "force-dynamic";
-
-async function isOnboardingComplete(orgId: string): Promise<boolean> {
-  const sb = createAdminClient();
-  const { data } = await sb
-    .from("org_profiles")
-    .select("mission")
-    .eq("org_id", orgId)
-    .maybeSingle();
-  const mission = (data as { mission?: string | null } | null)?.mission;
-  return typeof mission === "string" && mission.trim().length > 0;
-}
 
 export default async function OnboardingLayout({
   children,
@@ -22,10 +14,9 @@ export default async function OnboardingLayout({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
-  // Step 1 creates the org membership but the user still needs to fill in
-  // mission (step 2) and history (step 3). Only redirect away from onboarding
-  // once the profile is actually populated, otherwise step 2 / step 3 would
-  // be unreachable after step 1 saves.
+  // Only fully-onboarded users (step 3 complete → onboarding_completed_at set)
+  // are redirected out. Partially-onboarded users stay in the wizard so they
+  // can finish steps 2 and 3.
   const orgId = await getCurrentOrgId(user.id);
   if (orgId && (await isOnboardingComplete(orgId))) {
     redirect("/dashboard/grants");

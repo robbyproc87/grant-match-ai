@@ -156,7 +156,13 @@ export async function saveHistoryAndFinish(
     if (!member?.org_id) return { ok: false, error: "Complete step 1 first." };
     const orgId = member.org_id as string;
     const past_grants: PastGrant[] = data.past_grants;
-    await sb.from("org_profiles").update({ past_grants }).eq("org_id", orgId);
+    await sb
+      .from("org_profiles")
+      .update({
+        past_grants,
+        onboarding_completed_at: new Date().toISOString(),
+      })
+      .eq("org_id", orgId);
 
     // Insert pending match_score rows for every grant, then fire-and-forget compute.
     const { data: grants } = await sb.from("grants").select("id");

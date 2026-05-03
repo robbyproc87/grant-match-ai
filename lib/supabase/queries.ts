@@ -31,6 +31,24 @@ export async function getCurrentOrgProfile(
   return { ...profile, org_id: member.org_id };
 }
 
+/**
+ * Returns true only when the user has completed step 3 of onboarding
+ * (saveHistoryAndFinish stamps `onboarding_completed_at`). Use in route
+ * guards instead of "does an org_profile row exist" — step 1 creates the
+ * row, so existence alone is not a completion signal.
+ */
+export async function isOnboardingComplete(orgId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { data } = (await supabase
+    .from("org_profiles")
+    .select("onboarding_completed_at")
+    .eq("org_id", orgId)
+    .maybeSingle()) as {
+    data: { onboarding_completed_at: string | null } | null;
+  };
+  return Boolean(data?.onboarding_completed_at);
+}
+
 export async function getCurrentOrgId(userId: string): Promise<string | null> {
   const supabase = createClient();
   const { data } = (await supabase
