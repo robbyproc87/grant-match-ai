@@ -128,3 +128,39 @@ export async function removeFromPipeline(applicationId: string): Promise<Result>
     return { ok: false, error: err instanceof Error ? err.message : "failed" };
   }
 }
+
+/**
+ * WS3 outcome capture: record a terminal result (won/lost/declined) with the
+ * awarded amount + decision date. This is the data the Phase 3 win-probability
+ * model will train on (joined against each grant's fit score).
+ */
+export async function recordOutcome(
+  applicationId: string,
+  status: Extract<ApplicationStatus, "won" | "lost" | "declined">,
+  amount?: number | null,
+): Promise<Result> {
+  try {
+    if (!["won", "lost", "declined"].includes(status)) {
+      return { ok: false, error: "Outcome must be won, lost, or declined." };
+    }
+    const orgId = await callerOrgId();
+    if (!orgId) return { ok: false, error: "Not signed in." };
+    const sb = createClient();
+    const { error } = await sb
+      .from("applications")
+      .update({
+        status,
+        outcome_amount: status === "won" ? (amount ?? null) : null,
+        decided_at: new Date().toISOString(),
+      } as never)
+      .eq("id", applicationId)
+      .eq("org_id", orgId);
+    if (error) throw error;
+    log("api", "recorded outcome", { applicationId, status });
+    revalidatePath("/dashboard/pipeline");
+    return { ok: true };
+  } catch (err) {
+    logError("api", "recordOutcome failed", err);
+    return { ok: false, error: err instanceof Error ? err.message : "failed" };
+  }
+}

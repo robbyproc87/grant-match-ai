@@ -1,6 +1,53 @@
 export type OrgType = "nonprofit" | "school" | "government" | "tribal";
 export type DeadlineType = "fixed" | "rolling" | "loi_then_full";
 export type ScoreStatus = "pending" | "computing" | "computed" | "failed";
+export type StoryKind =
+  | "impact_stat"
+  | "testimonial"
+  | "program"
+  | "narrative"
+  | "other";
+
+export interface StoryBlock {
+  id: string;
+  org_id: string;
+  kind: StoryKind;
+  title: string;
+  content: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** The five narrative sections the shell drafts. */
+export interface DraftSections {
+  need_statement?: string;
+  goals?: string;
+  approach?: string;
+  budget_narrative?: string;
+  sustainability?: string;
+}
+
+export interface DraftReview {
+  summary: string;
+  suggestions: Array<{ section: string; issue: string; fix: string }>;
+}
+
+export interface ApplicationDraft {
+  application_id: string;
+  org_id: string;
+  sections: DraftSections;
+  review: DraftReview | null;
+  updated_at: string;
+}
+
+export const DRAFT_SECTION_KEYS: Array<keyof DraftSections> = [
+  "need_statement",
+  "goals",
+  "approach",
+  "budget_narrative",
+  "sustainability",
+];
 export type ApplicationStatus =
   | "identified"
   | "drafting"

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgProfile, getCurrentUser } from "@/lib/supabase/queries";
 import { PipelineClient } from "./pipeline-client";
-import type { Application, Grant } from "@/lib/types/db";
+import type { Application, Grant, MatchScore } from "@/lib/types/db";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +27,7 @@ export default async function PipelinePage() {
   const grantIds = [...new Set(applications.map((a) => a.grant_id))];
   let grants: Grant[] = [];
   let funderNames: Record<string, string> = {};
+  let matchScores: MatchScore[] = [];
 
   if (grantIds.length > 0) {
     const { data: grantsData } = await supabase
@@ -44,6 +45,14 @@ export default async function PipelinePage() {
       const funders = (fundersData ?? []) as Array<{ id: string; name: string }>;
       funderNames = Object.fromEntries(funders.map((f) => [f.id, f.name]));
     }
+
+    // Load match scores for this org + the grant IDs in the pipeline
+    const { data: scoresData } = await supabase
+      .from("match_scores")
+      .select("*")
+      .eq("org_id", profile.org_id)
+      .in("grant_id", grantIds);
+    matchScores = (scoresData ?? []) as MatchScore[];
   }
 
   const grantMap = new Map<string, Grant>(grants.map((g) => [g.id, g]));
@@ -53,6 +62,7 @@ export default async function PipelinePage() {
       applications={applications}
       grantMap={Object.fromEntries(grantMap)}
       funderNames={funderNames}
+      matchScores={matchScores}
     />
   );
 }
