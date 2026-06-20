@@ -12,7 +12,8 @@
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
     "seed:funders": "tsx scripts/seed-funders.ts",
-    "seed:grants": "tsx scripts/seed-grants.ts"
+    "seed:grants": "tsx scripts/seed-grants.ts",
+    "ingest:grantsgov": "tsx scripts/ingest-grantsgov.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",
