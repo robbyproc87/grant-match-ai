@@ -1,6 +1,26 @@
 export type OrgType = "nonprofit" | "school" | "government" | "tribal";
 export type DeadlineType = "fixed" | "rolling" | "loi_then_full";
 export type ScoreStatus = "pending" | "computing" | "computed" | "failed";
+export type ApplicationStatus =
+  | "identified"
+  | "drafting"
+  | "submitted"
+  | "won"
+  | "lost"
+  | "declined";
+
+export interface Application {
+  id: string;
+  org_id: string;
+  grant_id: string;
+  status: ApplicationStatus;
+  notes: string | null;
+  deadline: string | null;
+  owner_user_id: string | null;
+  checklist: Record<string, boolean>;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface OrgProfile {
   org_id: string;

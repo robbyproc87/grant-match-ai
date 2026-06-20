@@ -5,7 +5,11 @@ import { ChatClient } from "./chat-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatPage() {
+export default async function ChatPage({
+  searchParams,
+}: {
+  searchParams: { grantId?: string };
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
   const profile = await getCurrentOrgProfile(user.id);
@@ -27,5 +31,24 @@ export default async function ChatPage() {
     content: m.content,
   }));
 
-  return <ChatClient orgId={profile.org_id} initialMessages={initialMessages} />;
+  // Optional grant focus passed via ?grantId= (deep-link from a grant card).
+  const grantId = searchParams?.grantId;
+  let grantName: string | null = null;
+  if (grantId) {
+    const { data: g } = (await supabase
+      .from("grants")
+      .select("name")
+      .eq("id", grantId)
+      .maybeSingle()) as { data: { name: string } | null };
+    grantName = g?.name ?? null;
+  }
+
+  return (
+    <ChatClient
+      orgId={profile.org_id}
+      initialMessages={initialMessages}
+      grantId={grantName ? grantId : undefined}
+      grantName={grantName}
+    />
+  );
 }

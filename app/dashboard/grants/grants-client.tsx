@@ -8,6 +8,8 @@ import { FitBadge } from "@/components/fit-badge";
 import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/browser";
 import { recomputeAllForOrg, recomputeOneScore } from "@/lib/scoring/actions";
+import { addToPipeline } from "@/app/dashboard/pipeline/actions";
+import Link from "next/link";
 import { formatCurrency, formatDeadline, cn } from "@/lib/utils";
 import type { Grant, MatchScore, ScoreBreakdown } from "@/lib/types/db";
 import { toast } from "sonner";
@@ -187,6 +189,7 @@ function DetailPanel({
   breakdown: ScoreBreakdown;
   funderName: string;
 }) {
+  const [saving, setSaving] = useState(false);
   const factors: Array<[string, number, string]> = [
     [
       "Mission alignment",
@@ -237,6 +240,34 @@ function DetailPanel({
       {breakdown.eligibility.manual_checks.length > 0 && (
         <ManualReview rules={breakdown.eligibility.manual_checks} />
       )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full border-gm-purple100 text-gm-purple700 hover:bg-gm-purple50"
+        disabled={saving}
+        onClick={async () => {
+          setSaving(true);
+          const result = await addToPipeline(grant.id);
+          setSaving(false);
+          if (result.ok) {
+            toast.success("Saved to pipeline");
+          } else {
+            toast.error(result.error ?? "Failed to save");
+          }
+        }}
+      >
+        🗂 Save to pipeline
+      </Button>
+      <Button
+        asChild
+        variant="outline"
+        size="sm"
+        className="w-full border-gm-purple100 text-gm-purple700 hover:bg-gm-purple50"
+      >
+        <Link href={`/dashboard/chat?grantId=${grant.id}`}>
+          💬 Ask AI about this grant
+        </Link>
+      </Button>
       {grant.source_url && (
         <Button asChild variant="outline" size="sm" className="w-full">
           <a href={grant.source_url} target="_blank" rel="noreferrer">

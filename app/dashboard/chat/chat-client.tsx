@@ -10,13 +10,17 @@ type InitialMessage = { id: string; role: "user" | "assistant"; content: string 
 export function ChatClient({
   orgId,
   initialMessages,
+  grantId,
+  grantName,
 }: {
   orgId: string;
   initialMessages: InitialMessage[];
+  grantId?: string;
+  grantName?: string | null;
 }) {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: "/api/chat",
-    body: { orgId },
+    body: { orgId, grantId },
     initialMessages,
     onError: (err) => {
       toast.error(`Chat failed: ${err.message}`);
@@ -35,6 +39,11 @@ export function ChatClient({
             <div className="text-xs text-emerald-500">● Online</div>
           </div>
         </div>
+        {grantName && (
+          <div className="mt-3 rounded-lg border border-gm-purple100 bg-gm-purple50/50 px-3 py-2 text-xs text-gm-purple700">
+            🎯 Focused on <span className="font-semibold">{grantName}</span> — advice is tailored to this grant and your fit score.
+          </div>
+        )}
       </div>
       <div className="max-h-[60vh] min-h-64 space-y-3 overflow-y-auto p-4">
         {messages.length === 0 && (
