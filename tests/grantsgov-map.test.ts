@@ -398,3 +398,33 @@ describe("mapOpportunity — missing / partial synopsis fields never throw", () 
     ]);
   });
 });
+
+describe("funder name resolution (regression: synopsis.agencyName is junk)", () => {
+  it("prefers agencyDetails.agencyName over a contact-person agencyName", () => {
+    const r = mapOpportunity({
+      id: 362497,
+      owningAgencyCode: "USDA-FNS1",
+      agencyDetails: {
+        agencyCode: "USDA-FNS1",
+        agencyName: "Food and Nutrition Service",
+      },
+      topAgencyDetails: { agencyCode: "USDA", agencyName: "Department of Agriculture" },
+      synopsis: { agencyName: "Dawn Washington\nGrants Officer" },
+    });
+    expect(r.funder.name).toBe("Food and Nutrition Service");
+    expect(r.funder.source_id).toBe("USDA-FNS1");
+  });
+
+  it("falls back to topAgencyDetails, then synopsis.agencyName", () => {
+    expect(
+      mapOpportunity({
+        id: 1,
+        topAgencyDetails: { agencyName: "Department of Agriculture" },
+        synopsis: { agencyName: "Someone\nOfficer" },
+      }).funder.name,
+    ).toBe("Department of Agriculture");
+    expect(
+      mapOpportunity({ id: 2, synopsis: { agencyName: "Real Agency" } }).funder.name,
+    ).toBe("Real Agency");
+  });
+});

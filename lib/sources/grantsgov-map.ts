@@ -44,6 +44,8 @@ export type GrantsGovDescribedEntry =
 export interface GrantsGovSynopsis {
   agencyCode?: string;
   agencyName?: string;
+  agencyDetails?: GrantsGovAgencyDetails;
+  topAgencyDetails?: GrantsGovAgencyDetails;
   synopsisDesc?: string;
   /** Long human-readable timestamp: "Jul 08, 2026 12:00:00 AM EDT" */
   responseDate?: string;
@@ -61,12 +63,24 @@ export interface GrantsGovSynopsis {
   fundingActivityCategories?: GrantsGovDescribedEntry[];
 }
 
+/** Structured agency identity. Present on both the detail root and synopsis. */
+export interface GrantsGovAgencyDetails {
+  code?: string;
+  agencyCode?: string;
+  agencyName?: string;
+  topAgencyCode?: string;
+}
+
 /** The opportunity detail returned by POST /v1/api/fetchOpportunity → data */
 export interface GrantsGovOpportunityDetail {
   id?: number;
   opportunityNumber?: string;
   opportunityTitle?: string;
   owningAgencyCode?: string;
+  /** Reliable structured agency identity (sub-agency, e.g. "Food and Nutrition Service"). */
+  agencyDetails?: GrantsGovAgencyDetails;
+  /** Parent department, e.g. "Department of Agriculture". */
+  topAgencyDetails?: GrantsGovAgencyDetails;
   synopsis?: GrantsGovSynopsis;
 }
 
@@ -175,10 +189,24 @@ export function mapOpportunity(
   // Opportunity id — prefer the numeric id, fall back to opportunityNumber
   const opportunityId = detail.id != null ? String(detail.id) : "";
 
-  // Funder
+  // Funder. NOTE: syn.agencyName is unreliable — it sometimes contains the
+  // contact person ("Dawn Washington\nGrants Officer"). Prefer the structured
+  // agencyDetails.agencyName (sub-agency) → topAgencyDetails (parent dept) and
+  // only fall back to the free-text field as a last resort.
+  const agencyDetails = detail.agencyDetails ?? syn.agencyDetails;
+  const topAgencyDetails = detail.topAgencyDetails ?? syn.topAgencyDetails;
+  // Grouping key: keep owningAgencyCode first so re-ingestion updates existing
+  // funder rows in place rather than orphaning them.
   const agencyCode =
-    detail.owningAgencyCode ?? syn.agencyCode ?? "";
-  const agencyName = syn.agencyName ?? agencyCode;
+    detail.owningAgencyCode ??
+    agencyDetails?.agencyCode ??
+    syn.agencyCode ??
+    "";
+  const agencyName =
+    agencyDetails?.agencyName ??
+    topAgencyDetails?.agencyName ??
+    syn.agencyName ??
+    agencyCode;
 
   // Grant amounts
   const amountFloor = parseAmount(syn.awardFloor);
