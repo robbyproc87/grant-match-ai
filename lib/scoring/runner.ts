@@ -83,9 +83,57 @@ export async function computeOneScore(orgId: string, grantId: string): Promise<v
 }
 
 /**
+ * Drain the durable scoring queue. Atomically claims a batch of queued rows
+ * via `claim_scoring_jobs` (FOR UPDATE SKIP LOCKED — safe to run concurrently)
+ * and scores each with bounded concurrency (batch size = concurrency cap).
+ * Loops until the queue is empty or `maxBatches` is hit.
+ *
+ * Invoked two ways: (1) by pg_cron via /api/internal/drain-scoring every minute
+ * — the durable backstop that survives instance restarts; (2) best-effort by
+ * producers right after they enqueue, for immediate responsiveness. Either way
+ * unfinished rows stay 'pending' (or stale 'computing', reclaimed after the
+ * TTL), so no work is dropped on a crash.
+ */
+export async function drainScoringJobs(opts?: {
+  batch?: number;
+  maxBatches?: number;
+}): Promise<{ processed: number; batches: number }> {
+  const sb = createAdminClient();
+  const batch = opts?.batch ?? 5;
+  const maxBatches = opts?.maxBatches ?? 50;
+  let processed = 0;
+  let batches = 0;
+  for (; batches < maxBatches; batches++) {
+    const { data, error } = await sb.rpc("claim_scoring_jobs", { batch });
+    if (error) {
+      logError("scoring", "claim_scoring_jobs failed", error);
+      break;
+    }
+    const rows = (data ?? []) as Array<{
+      claimed_org_id: string;
+      claimed_grant_id: string;
+    }>;
+    if (rows.length === 0) break;
+    await Promise.all(
+      rows.map((r) => computeOneScore(r.claimed_org_id, r.claimed_grant_id)),
+    );
+    processed += rows.length;
+  }
+  if (processed > 0) log("scoring", "drain complete", { processed, batches });
+  return { processed, batches };
+}
+
+/** Fire the drain best-effort (don't block the producer; cron is the backstop). */
+function kickDrain(): void {
+  void drainScoringJobs().catch((err) =>
+    logError("scoring", "best-effort drain failed", err),
+  );
+}
+
+/**
  * Stale-while-revalidate: if the org_profile.updated_at is newer than a row's
- * computed_at, mark that row pending and recompute it. Cheap to call on every
- * dashboard load — touches only stale rows.
+ * computed_at, mark that row pending so the drainer recomputes it. Cheap to
+ * call on every dashboard load — touches only stale rows.
  */
 export async function requeueStaleScoresForOrg(orgId: string): Promise<void> {
   const sb = createAdminClient();
@@ -123,9 +171,7 @@ export async function requeueStaleScoresForOrg(orgId: string): Promise<void> {
     })),
     { onConflict: "org_id,grant_id" },
   );
-  for (const r of toRecompute) {
-    await computeOneScore(orgId, r.grant_id);
-  }
+  kickDrain();
 }
 
 /**
@@ -163,25 +209,22 @@ export async function recomputeAllNonComputedForOrg(orgId: string): Promise<void
     })),
     { onConflict: "org_id,grant_id" },
   );
-  for (const r of toRun) {
-    await computeOneScore(orgId, r.grant_id);
-  }
+  kickDrain();
 }
 
 export async function computeAllScoresForOrg(orgId: string): Promise<void> {
   const sb = createAdminClient();
   const { data: grants } = await sb.from("grants").select("id");
   if (!grants) return;
-  log("scoring", `starting computeAll`, { orgId, count: grants.length });
-  // mark all pending
+  log("scoring", `enqueued all`, { orgId, count: grants.length });
+  // Enqueue every grant as 'pending'; the drainer (kicked below + pg_cron)
+  // processes them with bounded concurrency. No inline serial loop — that was
+  // the Phase 1 fragility (lost on instance restart).
   const rows = grants.map((g) => ({
     org_id: orgId,
     grant_id: g.id as string,
     status: "pending" as const,
   }));
   await sb.from("match_scores").upsert(rows, { onConflict: "org_id,grant_id" });
-  // process serially to avoid Anthropic rate limits
-  for (const g of grants) {
-    await computeOneScore(orgId, g.id as string);
-  }
+  kickDrain();
 }

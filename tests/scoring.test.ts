@@ -333,6 +333,8 @@ describe("recomputeAllForOrg (Phase 1 escape hatch)", () => {
           },
         };
       },
+      // The best-effort drain kicked after enqueue claims nothing here.
+      rpc: async () => ({ data: [], error: null }),
     };
     return { client, upserts };
   }
@@ -368,15 +370,17 @@ describe("recomputeAllForOrg (Phase 1 escape hatch)", () => {
       expect(r.status).toBe("pending");
       expect(r.error_message).toBeNull();
     }
-    // Then computeOneScore should have been invoked once per grant — each
-    // invocation upserts 'computing' first, so we expect exactly 3 such rows.
+    // WS6: recompute is now ENQUEUE-ONLY. It no longer computes inline — the
+    // drainer (kicked best-effort + pg_cron backstop) does the work via
+    // claim_scoring_jobs. The mock claim returns nothing, so there must be no
+    // single-row 'computing' upserts from an inline loop.
     const computingUpserts = upserts.filter(
       (u) =>
         u.table === "match_scores" &&
         u.rows.length === 1 &&
         u.rows[0].status === "computing",
     );
-    expect(computingUpserts).toHaveLength(3);
+    expect(computingUpserts).toHaveLength(0);
   });
 
   it("no-ops when no rows are in pending|computing|failed (all already computed)", async () => {
@@ -387,5 +391,72 @@ describe("recomputeAllForOrg (Phase 1 escape hatch)", () => {
     await runner.recomputeAllNonComputedForOrg("o1");
 
     expect(upserts).toHaveLength(0);
+  });
+});
+
+describe("drainScoringJobs (WS6 durable queue)", () => {
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = "test";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "http://x";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "x";
+    vi.resetModules();
+  });
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/lib/supabase/admin");
+  });
+
+  it("claims a batch, processes each, then stops when the queue drains", async () => {
+    type Row = Record<string, unknown>;
+    const upserts: Row[] = [];
+    // First claim returns one job; second returns none → loop terminates.
+    const claims: Array<Array<{ claimed_org_id: string; claimed_grant_id: string }>> = [
+      [{ claimed_org_id: "o1", claimed_grant_id: "g1" }],
+      [],
+    ];
+    const client = {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                // computeOneScore loaders → null so it writes a terminal 'failed'.
+                return { maybeSingle: async () => ({ data: null }) };
+              },
+            };
+          },
+          upsert: async (payload: Row | Row[]) => {
+            for (const r of Array.isArray(payload) ? payload : [payload]) upserts.push(r);
+            return { error: null };
+          },
+        };
+      },
+      rpc: async () => ({ data: claims.shift() ?? [], error: null }),
+    };
+    vi.doMock("@/lib/supabase/admin", () => ({ createAdminClient: () => client }));
+    const runner = await import("@/lib/scoring/runner");
+
+    const result = await runner.drainScoringJobs({ batch: 5 });
+
+    expect(result.processed).toBe(1);
+    // The claimed job ran computeOneScore, which wrote a terminal row.
+    const terminal = upserts.find(
+      (r) => r.status === "failed" || r.status === "computed",
+    );
+    expect(terminal, "drain should process the claimed job to a terminal state").toBeTruthy();
+  });
+
+  it("stops immediately on claim error (no infinite loop)", async () => {
+    const client = {
+      from() {
+        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) };
+      },
+      rpc: async () => ({ data: null, error: { message: "boom" } }),
+    };
+    vi.doMock("@/lib/supabase/admin", () => ({ createAdminClient: () => client }));
+    const runner = await import("@/lib/scoring/runner");
+    const result = await runner.drainScoringJobs();
+    expect(result.processed).toBe(0);
+    expect(result.batches).toBe(0);
   });
 });
