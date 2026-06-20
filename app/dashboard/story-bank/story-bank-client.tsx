@@ -138,9 +138,14 @@ export function StoryBankClient({ initialBlocks }: Props) {
         tags,
       });
       if (result.ok) {
+        // Reconcile the temp row with the real id/org_id so a subsequent
+        // edit/delete in this session targets the actual DB row.
+        setBlocks((prev) =>
+          prev.map((b) =>
+            b.id === tempId ? { ...b, id: result.id, org_id: result.org_id } : b,
+          ),
+        );
         toast.success("Story added.");
-        // Remove the temp — revalidatePath will serve fresh data on next load
-        // but for this session we keep optimistic
       } else {
         setBlocks((prev) => prev.filter((b) => b.id !== tempId));
         toast.error(result.error ?? "Failed to add.");

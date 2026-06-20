@@ -119,6 +119,9 @@ function ShellEditor({ applications, grantMap, funderNames, draftMap }: Props) {
   );
 
   const handleGenerate = async () => {
+    // Cancel any pending autosave so a stale debounced write can't land after
+    // (and overwrite) the freshly generated draft.
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setGenerating(true);
     toast.loading("Generating draft…", { id: "generate" });
     const result = await generateDraft(selectedApp.id);

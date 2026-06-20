@@ -361,15 +361,16 @@ function ApplicationCard({
 
   const handleRemove = async () => {
     setRemoving(true);
-    // Optimistic
-    onRemove(app.id);
+    // Await first, then remove — so a failed delete doesn't make the card
+    // vanish from the UI while still existing in the DB (no revert path).
     const result = await removeFromPipeline(app.id);
-    if (!result.ok) {
-      toast.error(result.error ?? "Failed to remove");
-    } else {
+    if (result.ok) {
+      onRemove(app.id);
       toast.success("Removed from pipeline");
+    } else {
+      setRemoving(false);
+      toast.error(result.error ?? "Failed to remove");
     }
-    setRemoving(false);
   };
 
   return (
